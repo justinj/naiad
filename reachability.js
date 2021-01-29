@@ -110,7 +110,32 @@ const less = (a, b) => {
 };
 
 const Timestamp = (x) => [x, []];
-const apply = ([t, counters], { e, f, push }) => {
+const MaxTimestamp = Timestamp(Infinity);
+
+const tsLess = ([a, as], [b, bs]) => {
+  if (a < b) return true;
+  if (a > b) return false;
+  for (let i = 0; i < as.length || i < bs.length; i++) {
+    if (as[i] < bs[i]) return true;
+    if (as[i] > bs[i]) return false;
+  }
+  return false;
+};
+
+const tsMin = (f, ...xs) => {
+  for (let x of xs) {
+    if (tsLess(x, f)) f = x;
+  }
+  return f;
+};
+
+const apply = ([t, counters], sum) => {
+  if (sum === Unreachable || t === Infinity) {
+    return MaxTimestamp;
+  }
+  let e = sum.e;
+  let f = sum.f;
+  let push = sum.push;
   counters = counters.slice();
   for (let i = 0; i < e; i++) {
     counters.pop();
@@ -132,7 +157,10 @@ module.exports = {
   I,
   F,
   Timestamp,
+  MaxTimestamp,
   apply,
   less,
   Unreachable,
+  tsLess,
+  tsMin,
 };

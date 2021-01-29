@@ -1,5 +1,5 @@
 const { DataflowBuilder } = require("./push");
-const { Timestamp, I, E, F, apply } = require("./reachability");
+const { Timestamp, I, E, F, apply, tsLess } = require("./reachability");
 
 describe("push", () => {
   it("runs", () => {
@@ -24,6 +24,16 @@ describe("push", () => {
         out.push([m, t]);
       },
       onNotify(t) {
+        console.log("notified of", t);
+        let newOut = [];
+        for (let [m, ts] of out) {
+          if (tsLess(ts, t)) {
+            console.log(m);
+          } else {
+            newOut.push([m, ts]);
+          }
+        }
+        out = newOut;
         notify(t);
       },
     }));
@@ -62,10 +72,16 @@ describe("push", () => {
     d.edge(b, 0, e, 0);
     d.edge(e, 0, c, 0, E);
 
-    send(1, Timestamp(0));
+    d.build();
 
-    for (let i = 0; i < 10; i++) {
-      d.step();
+    send(1, Timestamp(0));
+    send(10, Timestamp(1));
+    send(100, Timestamp(2));
+    notify(Timestamp(10));
+
+    for (let i = 1; i < 10; i++) {
+      console.log("advancing to", i);
+      d.advanceTo(Timestamp(i));
     }
 
     console.log(out);

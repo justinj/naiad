@@ -30,6 +30,7 @@ describe("summaries", () => {
       ["e", "ei", "eei"],
       ["ef", "ei", "eei"],
       ["eiiif", "ei", "eiii"],
+      ["f", "e", "e"],
     ]) {
       a = parseSummary(a);
       b = parseSummary(b);
