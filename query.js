@@ -13,13 +13,13 @@ const {
 const Query = () => {
   let builder = DataflowBuilder();
 
-  const wrap = (node, summary = Summary(0, 0, [])) => {
+  const asStream = (node, summary = Summary(0, 0, [])) => {
     let makeScope = (summary) => {
       let t = apply(Timestamp(0), summary);
       let scope = {
         node,
         asStream(node) {
-          return wrap(node, summary);
+          return asStream(node, summary);
         },
         forEach(f) {
           let next = scope.vertex((send, notify) => ({
@@ -241,7 +241,7 @@ const Query = () => {
   return {
     Source() {
       let [node, send, notify] = builder.source(Timestamp(0));
-      return [wrap(node), send, notify];
+      return [asStream(node), send, notify];
     },
   };
 };
