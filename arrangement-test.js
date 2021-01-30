@@ -70,4 +70,23 @@ describe("arrangement", () => {
       []
     );
   });
+
+  it("handles lookups", () => {
+    let a = arr();
+
+    a.insert(1, Timestamp(0), 1);
+    a.insert(2, Timestamp(0), 1);
+    a.insert(1, Timestamp(1), -1);
+    a.insert(3, Timestamp(1), -1);
+    a.notify(Timestamp(2));
+
+    assert.deepStrictEqual(
+      [...a.lookup(Timestamp(0), 1)].map((t) => t[0]),
+      [1]
+    );
+    assert.deepStrictEqual(
+      [...a.lookup(Timestamp(1), 1)].map((t) => t[0]),
+      []
+    );
+  });
 });

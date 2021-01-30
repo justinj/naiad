@@ -67,7 +67,7 @@ function Arrange(def) {
     }
   };
 
-  return {
+  let self = {
     insert(data, time, diff) {
       spine.push([[data, time, diff]]);
       maybeMerge(spine.length - 1);
@@ -76,6 +76,16 @@ function Arrange(def) {
       if (notified === null || tsLess(notified, ts)) {
         notified = ts;
       }
+    },
+    lookup(ts, key) {
+      // TODO: make this actually good lol
+      let out = [];
+      for (let row of self.read(ts)) {
+        if (def.keyCmp(key, def.key(row[0])) === 0) {
+          out.push(row);
+        }
+      }
+      return out;
     },
     read(ts) {
       let out = [];
@@ -115,6 +125,8 @@ function Arrange(def) {
       return out;
     },
   };
+
+  return self;
 }
 
 module.exports = { Arrange };
