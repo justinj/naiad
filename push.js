@@ -68,8 +68,6 @@ let DataflowBuilder = () => {
     }
   };
 
-  let defaultCap = Timestamp(0);
-
   let self = {
     send(from, port, msg, t) {
       for (let { to, toPort } of vertices[from].edges[port] || []) {
@@ -80,12 +78,6 @@ let DataflowBuilder = () => {
           port: toPort,
         });
       }
-    },
-    enter() {
-      defaultCap = apply(defaultCap, Summary(0, 0, [0]));
-    },
-    exit() {
-      defaultCap = apply(defaultCap, Summary(1, 0, []));
     },
     notify(from, t) {
       let v = vertices[from];
@@ -108,7 +100,7 @@ let DataflowBuilder = () => {
         toPort,
       });
     },
-    source(name = "") {
+    source(defaultCap, name = "") {
       let v = vertices.length;
       vertices.push({
         name,
@@ -122,7 +114,7 @@ let DataflowBuilder = () => {
       });
       return [v, self.send.bind(this, v, 0), self.notify.bind(this, v)];
     },
-    vertex(defn, name = "") {
+    vertex(defaultCap, defn = () => null, name = "") {
       let v = vertices.length;
       let send = self.send.bind(this, v);
       let notify = self.notify.bind(this, v);
@@ -130,7 +122,15 @@ let DataflowBuilder = () => {
       vertices.push({
         name,
         id: builder.node(name),
-        impl: defn(send, notify, pending),
+        impl: {
+          recv(e, m, t) {
+            send(0, m, t);
+          },
+          onNotify(t) {
+            notify(t);
+          },
+          ...defn(send, notify, pending),
+        },
         inbox: [],
         edges: [],
         cap: defaultCap,

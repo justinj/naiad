@@ -111,7 +111,7 @@ describe("query", () => {
         v
           .concat(
             v.join(
-              edgeColl,
+              v.enter(edgeColl),
               (x) => x,
               (e) => e[0],
               (_, e) => e[1]
@@ -124,11 +124,11 @@ describe("query", () => {
     graph.Build();
 
     for (let e of edges) {
-      sendEdge(e, [0, [0]]);
+      sendEdge(e, Timestamp(0));
     }
     sendVert(1, Timestamp(0));
 
-    notifyEdge([1, [0]]);
+    notifyEdge(Timestamp(1));
     notifyVert(Timestamp(1));
     graph.RunTo(Timestamp(1));
 

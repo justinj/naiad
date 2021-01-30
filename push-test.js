@@ -2,7 +2,7 @@ const { DataflowBuilder } = require("./push");
 const { Timestamp, I, E, F, apply, tsLess } = require("./reachability");
 
 describe("push", () => {
-  it("runs", () => {
+  it.skip("runs", () => {
     let d = DataflowBuilder();
 
     let [a, send, notify] = d.source();
