@@ -24,11 +24,10 @@ describe("push", () => {
         out.push([m, t]);
       },
       onNotify(t) {
-        console.log("notified of", t);
         let newOut = [];
         for (let [m, ts] of out) {
           if (tsLess(ts, t)) {
-            console.log(m);
+            // console.log(m);
           } else {
             newOut.push([m, ts]);
           }
@@ -80,11 +79,10 @@ describe("push", () => {
     notify(Timestamp(10));
 
     for (let i = 1; i < 10; i++) {
-      console.log("advancing to", i);
       d.advanceTo(Timestamp(i));
     }
 
-    console.log(out);
+    // console.log(out);
 
     // let a = d.Collection(
     //   { value: 1, t: Timestamp(1) },

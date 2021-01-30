@@ -5,12 +5,10 @@ const Query = () => {
   let builder = DataflowBuilder();
 
   const wrap = (node) => {
-    let flatMap = (f) => {
+    let forEach = (f) => {
       let next = builder.vertex((send, notify) => ({
         recv(e, m, t) {
-          for (x of f(m)) {
-            send(0, x, t);
-          }
+          f(send, e, m, t);
         },
         onNotify(t) {
           notify(t);
@@ -20,6 +18,13 @@ const Query = () => {
 
       return wrap(next);
     };
+    let flatMap = (f) =>
+      forEach((send, e, m, t) => {
+        for (let x of f(m)) {
+          send(e, x, t);
+        }
+      });
+
     let concat = (other) => {
       let next = builder.vertex((send, notify) => ({
         recv(e, m, t) {
