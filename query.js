@@ -1,6 +1,7 @@
 const { DataflowBuilder } = require("./push");
 const {
   tsMin,
+  tsMax,
   tsLess,
   I,
   E,
@@ -135,9 +136,8 @@ const Query = () => {
                 }
                 leftTable[key].push([m, t]);
                 for (let [row, ts] of rightTable[key] || []) {
-                  let outTs = ts;
-                  if (tsLess(ts, t)) outTs = t;
-                  send(0, combine(m, row), outTs);
+                  // console.log("join emitting", combine(m, row));
+                  send(0, combine(m, row), tsMax(ts, t));
                 }
               } else if (e === 1) {
                 let key = rightKey(m);
@@ -146,9 +146,8 @@ const Query = () => {
                 }
                 rightTable[key].push([m, t]);
                 for (let [row, ts] of leftTable[key] || []) {
-                  let outTs = ts;
-                  if (tsLess(ts, t)) outTs = t;
-                  send(0, combine(row, m), outTs);
+                  // console.log("join emitting", combine(row, m));
+                  send(0, combine(row, m), tsMax(ts, t));
                 }
               }
             },
@@ -188,6 +187,111 @@ const Query = () => {
               }
               queue = newQueue;
               notify(tsMin(ts, ...queue.map((x) => x.t)));
+            },
+          }));
+          builder.edge(node, 0, next, 0);
+
+          return scope.asStream(next);
+        },
+        mapBoth(f, { diffIsZero } = { diffIsZero: (a) => a === 0 }) {
+          return scope.flatMap(([m, d]) => {
+            let [newM, newD] = f(m, d);
+            if (diffIsZero(newD)) {
+              return [];
+            } else {
+              return [[newM, newD]];
+            }
+          });
+        },
+        diffDistinct({ diffIsZero }) {
+          return scope
+            .reduce(
+              (x) => x,
+              () => true
+            )
+            .mapBoth(([m, d1], d2) => {
+              if (diffIsZero(d1)) {
+                return [m, -Math.sign(d2)];
+              } else {
+                return [m, Math.sign(d2)];
+              }
+            })
+            .consolidate({
+              hash: (x) => x,
+              diffAdd: (a, b) => a + b,
+              diffIsZero: (a) => a === 0,
+            });
+        },
+        reduce(key, combine) {
+          let groups = {};
+          return (
+            scope
+              .consolidate({
+                hash: key,
+                diffAdd: (a, b) => a + b,
+                diffIsZero: (a) => a === 0,
+              })
+              // .inspect((x, t) => console.log(`c1 emitting ${x}@${t}`))
+              .forEach((send, _, [m, d], t) => {
+                // console.log("foreach seeing", m, d, t);
+                let k = key(m);
+                if (groups.hasOwnProperty(k)) {
+                  let [oldMult, oldVal] = groups[k];
+                  let added = combine(oldVal, m * d);
+                  send(0, [[k, oldVal], -1], t);
+                  if (oldMult + d === 0) {
+                    delete groups[k];
+                  } else {
+                    send(0, [[k, added], 1], t);
+                    groups[k] = [oldMult + d, added];
+                  }
+                  // console.log(groups);
+                } else {
+                  groups[k] = [d, m * d];
+                  send(0, [[k, m * d], 1], t);
+                }
+              })
+          );
+          // .inspect((x, t) => console.log(`forEach emitting ${x}@${t}`));
+        },
+        consolidate({ hash, diffAdd, diffIsZero }) {
+          let out = [];
+          let next = scope.vertex((send, notify, pending) => ({
+            recv(e, m, t) {
+              pending(1);
+              out.push([m, t]);
+            },
+            onNotify(t) {
+              out.sort(([m1, t1], [m2, t2]) => (tsLess(t1, t2) ? -1 : 1));
+              let i = 0;
+              while (i < out.length && tsLess(out[i][1], t)) {
+                let lowestTs = out[i][1];
+                let epoch = [];
+                while (i < out.length && !tsLess(lowestTs, out[i][1])) {
+                  pending(-1);
+                  epoch.push(out[i][0]);
+                  i++;
+                }
+                let grouped = {};
+                let ks = [];
+                for (let [m, diff] of epoch) {
+                  let k = hash(m);
+                  if (grouped.hasOwnProperty(k)) {
+                    grouped[k][1] = diffAdd(grouped[k][1], diff);
+                  } else {
+                    grouped[k] = [m, diff];
+                    ks.push(k);
+                  }
+                }
+                for (let k of ks) {
+                  if (!diffIsZero(grouped[k][1])) {
+                    send(0, grouped[k], lowestTs);
+                  }
+                }
+              }
+
+              out = out.slice(i);
+              notify(t);
             },
           }));
           builder.edge(node, 0, next, 0);

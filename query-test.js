@@ -92,6 +92,178 @@ describe("query", () => {
     );
   });
 
+  it("does a differential distinct", () => {
+    let q = Query();
+    let [node, send, notify] = q.Source();
+
+    let out = [];
+    let sel = node
+      .diffDistinct({ diffIsZero: (a) => a === 0 })
+      .inspect((x) => out.push(x));
+
+    sel.Build();
+
+    send([1, 1], Timestamp(0));
+    send([1, 1], Timestamp(0));
+    send([1, 1], Timestamp(0));
+
+    // notify(Timestamp(1));
+    // sel.RunTo(Timestamp(1));
+    // console.log("removed zero");
+    // console.log(out);
+
+    // send([1, -1], Timestamp(1));
+    // console.log("removed one");
+    // out = [];
+    // notify(Timestamp(2));
+    // sel.RunTo(Timestamp(2));
+    // console.log(out);
+    // console.log("removed two");
+    // out = [];
+    // send([1, -1], Timestamp(2));
+    // notify(Timestamp(3));
+    // sel.RunTo(Timestamp(3));
+    // console.log(out);
+    // console.log("removed three");
+    // out = [];
+    // send([1, -1], Timestamp(3));
+    // notify(Timestamp(4));
+    // sel.RunTo(Timestamp(4));
+    // console.log(out);
+
+    // send([1, 1], Timestamp(1));
+    // notify(Timestamp(2));
+    // sel.RunTo(Timestamp(2));
+  });
+
+  it("reduces", () => {
+    let q = Query();
+    let [node, send, notify] = q.Source();
+
+    let out = [];
+    let sel = node
+      .reduce(
+        () => true,
+        (a, b) => a + b
+      )
+      .inspect((x) => out.push(x));
+
+    sel.Build();
+
+    send([1, 1], Timestamp(0));
+    send([2, 1], Timestamp(0));
+    send([1, 1], Timestamp(0));
+    send([2, -1], Timestamp(0));
+    send([1, 1], Timestamp(0));
+
+    notify(Timestamp(1));
+    sel.RunTo(Timestamp(1));
+
+    send([1, 1], Timestamp(1));
+    notify(Timestamp(2));
+    sel.RunTo(Timestamp(2));
+
+    assert.deepStrictEqual(out, [
+      [[true, 3], 1],
+      [[true, 3], -1],
+      [[true, 4], 1],
+    ]);
+  });
+
+  it("consolidates", () => {
+    let q = Query();
+    let [node, send, notify] = q.Source();
+
+    let out = [];
+    let sel = node
+      .consolidate({
+        diffAdd: (a, b) => a + b,
+        diffIsZero: (a) => a === 0,
+        hash: (a) => a.toString(),
+      })
+      .inspect((x) => out.push(x));
+
+    sel.Build();
+
+    send([1, 1], Timestamp(0));
+    send([2, 1], Timestamp(0));
+    send([1, 1], Timestamp(0));
+    send([2, -1], Timestamp(0));
+    send([1, 1], Timestamp(0));
+    send([1, -1], Timestamp(1));
+
+    notify(Timestamp(1));
+    sel.RunTo(Timestamp(1));
+
+    assert.deepStrictEqual(out, [[1, 3]]);
+    out = [];
+
+    notify(Timestamp(2));
+    sel.RunTo(Timestamp(2));
+
+    assert.deepStrictEqual(out, [[1, -1]]);
+  });
+
+  it("does a graph differentially", () => {
+    let q = Query();
+
+    let edges = [
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [5, 6],
+    ];
+
+    let [edgeColl, sendEdge, notifyEdge] = q.Source();
+    let [vertColl, sendVert, notifyVert] = q.Source();
+
+    let graph = vertColl
+      .iterate((reach) =>
+        reach
+          .join(
+            reach.enter(edgeColl),
+            (x) => x[0],
+            (e) => e[0][0],
+            ([_, m1], [e, m2]) => [e[1], m1 * m2]
+          )
+          // .inspect(([x, m]) => console.log(`join out ${x}:${m}`))
+          .diffDistinct({ diffIsZero: (a) => a === 0 })
+      )
+      .concat(vertColl)
+      .inspect((x) => console.log("reachable:", x));
+
+    graph.Build();
+
+    for (let e of edges) {
+      console.log("adding edge", e);
+      sendEdge([e, 1], Timestamp(0));
+    }
+    console.log("roots: 1");
+    sendVert([1, 1], Timestamp(0));
+
+    notifyEdge(Timestamp(1));
+    notifyVert(Timestamp(1));
+    graph.RunTo(Timestamp(1));
+
+    console.log("...");
+
+    console.log("adding edge [4,5]");
+    sendEdge([[4, 5], 1], Timestamp(1));
+    notifyEdge(Timestamp(2));
+    notifyVert(Timestamp(2));
+    graph.RunTo(Timestamp(2));
+
+    console.log("...");
+
+    console.log("removing edge [4,5]");
+    sendEdge([[4, 5], -1], Timestamp(2));
+    notifyEdge(Timestamp(3));
+    notifyVert(Timestamp(3));
+    graph.RunTo(Timestamp(3));
+
+    // assert.deepStrictEqual(out.map(([a]) => a), [1, 2, 3, 4]);
+  });
+
   it("does a graph", () => {
     let q = Query();
 

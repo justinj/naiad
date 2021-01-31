@@ -129,6 +129,13 @@ const tsMin = (f, ...xs) => {
   return f;
 };
 
+const tsMax = (f, ...xs) => {
+  for (let x of xs) {
+    if (tsLess(f, x)) f = x;
+  }
+  return f;
+};
+
 const apply = ([t, counters], sum) => {
   if (sum === Unreachable || t === Infinity) {
     return MaxTimestamp;
@@ -163,4 +170,5 @@ module.exports = {
   Unreachable,
   tsLess,
   tsMin,
+  tsMax,
 };
